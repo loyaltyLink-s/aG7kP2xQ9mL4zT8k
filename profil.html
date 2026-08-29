@@ -81,7 +81,11 @@
     function tampilkanView(profile, email) {
       document.getElementById('view-foto').src = profile?.foto_url || 'assets/default-avatar.png';
       document.getElementById('view-nama').textContent = profile?.nama || email;
-      document.getElementById('view-level').textContent = profile?.is_admin ? 'Admin' : (profile?.level || 'Member');
+
+      const levelEl = document.getElementById('view-level');
+      levelEl.textContent = profile?.is_admin ? 'Admin' : (profile?.level || 'Member');
+      levelEl.classList.toggle('level-badge-admin', !!profile?.is_admin);
+
       document.getElementById('view-bio').textContent = profile?.bio || 'Belum ada bio.';
       document.getElementById('view-deskripsi').textContent = profile?.deskripsi || 'Belum ada deskripsi.';
       document.getElementById('view-mode').style.display = 'block';
