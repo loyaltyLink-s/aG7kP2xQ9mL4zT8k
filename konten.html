@@ -25,7 +25,7 @@
   <script src="js/profile-badge.js"></script>
   <script>
     // GANTI dengan Web app URL hasil deploy apps-script/Code.gs
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyFKT-slhtYwZcjZnxTjtOxTfEHowNyJGf19TC_GysANMnTqFlIUhQmC5bEbl4Gcs18Q/exec';
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEIYaZ0PlYnA-YktavOo-4970eCWnVQNK3pBMM7XRpxctTOB-fEVT9JtcbxvmtjJ9QJA/exec';
 
     renderSidebar('konten');
     renderProfileBadge();
@@ -124,8 +124,6 @@
     }
 
     (async () => {
-      const session = await requireAuth();
-      if (!session) return; // sudah di-redirect oleh requireAuth()
       await muatKonten();
     })();
   </script>
