@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="page-wrap">
+    <h1>Panel Admin</h1>
+    <p class="text-muted">Upload konten baru atau kelola yang sudah ada.</p>
+
+    <!-- Form upload -->
+    <div class="card" style="margin-top:20px;">
+      <h2 style="font-size:16px;">Upload Konten Baru</h2>
+
+      <div class="profile-field">
+        <label>Judul</label>
+        <input type="text" id="input-judul" class="input" placeholder="Judul konten">
+      </div>
+
+      <div class="profile-field">
+        <label>Thumbnail (gambar, maks 2 MB)</label>
+        <input type="file" id="input-thumbnail" accept="image/png, image/jpeg, image/webp">
+      </div>
+
+      <div class="profile-field">
+        <label>File Konten</label>
+        <input type="file" id="input-file">
+      </div>
+
+      <button class="btn btn-primary" id="btn-upload" onclick="prosesUploadKonten()">Upload</button>
+      <p class="progress-text" id="upload-feedback" style="margin-top:12px;"></p>
+    </div>
+
+    <!-- Daftar konten -->
+    <div class="card" style="margin-top:24px;">
+      <h2 style="font-size:16px;">Konten Tersimpan</h2>
+      <div id="daftar-konten" style="margin-top:14px;"></div>
+      <div id="daftar-kosong" class="empty-state" style="display:none;">
+        Belum ada konten yang diupload.
+      </div>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/profile-badge.js"></script>
+  <script>
+    // GANTI dengan Web app URL hasil deploy apps-script/Code.gs
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyarvjtlVCselntUJDinpIHJ1txCJhhtJ7gPW346jiOKR48dmJ3LjxoBsNb9FCE4FYX/exec';
+    const BATAS_UKURAN_THUMBNAIL = 2 * 1024 * 1024; // 2 MB
+    const TIPE_THUMBNAIL_DIIZINKAN = ['image/jpeg', 'image/png', 'image/webp'];
+
+    renderSidebar('admin');
+    renderProfileBadge();
+
+    let sessionAdmin = null;
+
+    function escapeHTML(teks) {
+      const div = document.createElement('div');
+      div.textContent = teks ?? '';
+      return div.innerHTML;
+    }
+
+    function formatTanggal(iso) {
+      return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function bacaFileSebagaiBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function panggilAppsScript(payload) {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.json();
+    }
+
+    async function prosesUploadKonten() {
+      const feedback = document.getElementById('upload-feedback');
+      const tombol = document.getElementById('btn-upload');
+
+      const judul = document.getElementById('input-judul').value.trim();
+      const thumbnailFile = document.getElementById('input-thumbnail').files[0];
+      const kontenFile = document.getElementById('input-file').files[0];
+
+      if (!judul || !thumbnailFile || !kontenFile) {
+        feedback.textContent = 'Judul, thumbnail, dan file konten wajib diisi.';
+        return;
+      }
+      if (!TIPE_THUMBNAIL_DIIZINKAN.includes(thumbnailFile.type)) {
+        feedback.textContent = 'Thumbnail harus JPG, PNG, atau WEBP.';
+        return;
+      }
+      if (thumbnailFile.size > BATAS_UKURAN_THUMBNAIL) {
+        feedback.textContent = 'Ukuran thumbnail maksimal 2 MB.';
+        return;
+      }
+
+      tombol.disabled = true;
+
+      try {
+        // 1. Upload thumbnail ke Supabase Storage
+        feedback.textContent = 'Mengupload thumbnail...';
+        const namaThumb = `${sessionAdmin.user.id}-${Date.now()}-${thumbnailFile.name}`;
+        const { error: errThumb } = await supabaseClient.storage
+          .from('thumbnails')
+          .upload(namaThumb, thumbnailFile);
+        if (errThumb) throw new Error('Upload thumbnail gagal: ' + errThumb.message);
+        const { data: urlThumb } = supabaseClient.storage.from('thumbnails').getPublicUrl(namaThumb);
+
+        // 2. Upload file konten ke Google Drive lewat Apps Script
+        feedback.textContent = 'Mengupload file konten (bisa perlu waktu untuk file besar)...';
+        const dataBase64 = await bacaFileSebagaiBase64(kontenFile);
+        const hasilUpload = await panggilAppsScript({
+          action: 'upload',
+          token: sessionAdmin.access_token,
+          filename: kontenFile.name,
+          mimeType: kontenFile.type || 'application/octet-stream',
+          dataBase64,
+        });
+        if (hasilUpload.error) throw new Error(hasilUpload.error);
+
+        // 3. Simpan baris konten ke Supabase
+        feedback.textContent = 'Menyimpan data konten...';
+        const { error: errInsert } = await supabaseClient.from('konten').insert({
+          judul,
+          thumbnail_url: urlThumb.publicUrl,
+          drive_file_id: hasilUpload.fileId,
+          uploaded_by: sessionAdmin.user.id,
+        });
+        if (errInsert) throw new Error('Gagal simpan data: ' + errInsert.message);
+
+        feedback.textContent = 'Berhasil diupload.';
+        document.getElementById('input-judul').value = '';
+        document.getElementById('input-thumbnail').value = '';
+        document.getElementById('input-file').value = '';
+        await muatDaftarKonten();
+      } catch (err) {
+        feedback.textContent = err.message;
+      } finally {
+        tombol.disabled = false;
+      }
+    }
+
+    async function hapusKonten(id, driveFileId) {
+      if (!confirm('Yakin ingin menghapus konten ini?')) return;
+
+      const hasilHapus = await panggilAppsScript({
+        action: 'delete',
+        token: sessionAdmin.access_token,
+        fileId: driveFileId,
+      });
+      if (hasilHapus.error) {
+        alert('Gagal menghapus file di Drive: ' + hasilHapus.error);
+        return;
+      }
+
+      const { error } = await supabaseClient.from('konten').delete().eq('id', id);
+      if (error) {
+        alert('File Drive terhapus, tapi gagal menghapus data: ' + error.message);
+        return;
+      }
+      await muatDaftarKonten();
+    }
+
+    async function muatDaftarKonten() {
+      const { data, error } = await supabaseClient
+        .from('konten')
+        .select('*')
+        .order('uploaded_at', { ascending: false });
+
+      const container = document.getElementById('daftar-konten');
+      const kosong = document.getElementById('daftar-kosong');
+
+      if (error) {
+        container.innerHTML = `<p class="text-muted">Gagal memuat: ${escapeHTML(error.message)}</p>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '';
+        kosong.style.display = 'block';
+        return;
+      }
+      kosong.style.display = 'none';
+
+      container.innerHTML = data.map(item => `
+        <div class="admin-row">
+          <img src="${escapeHTML(item.thumbnail_url)}" alt="${escapeHTML(item.judul)}"
+               onerror="this.onerror=null; this.src='assets/default-thumb.png';">
+          <div class="admin-row-info">
+            <div class="admin-row-judul">${escapeHTML(item.judul)}</div>
+            <div class="admin-row-tanggal">${formatTanggal(item.uploaded_at)}</div>
+          </div>
+          <button class="btn btn-danger" onclick="hapusKonten('${item.id}', '${escapeHTML(item.drive_file_id)}')">
+            Hapus
+          </button>
+        </div>
+      `).join('');
+    }
+
+    (async () => {
+      const hasil = await requireAdmin();
+      if (!hasil) return; // sudah di-redirect oleh requireAdmin()
+      sessionAdmin = hasil.session;
+      await muatDaftarKonten();
+    })();
+  </script>
+</body>
+</html>
