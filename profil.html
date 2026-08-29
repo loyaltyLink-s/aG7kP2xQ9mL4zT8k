@@ -132,43 +132,51 @@
 
     async function simpanProfil() {
       const feedback = document.getElementById('edit-feedback');
+      const tombolSimpan = document.querySelector('#edit-mode .btn-primary');
       feedback.textContent = 'Menyimpan...';
+      tombolSimpan.disabled = true;
 
-      let fotoUrl = profilAktif?.foto_url || null;
-      if (fotoBaruFile) {
-        if (fotoBaruFile.size > BATAS_UKURAN_FOTO) {
-          feedback.textContent = 'Ukuran file terlalu besar. Maksimal 2 MB.';
+      try {
+        let fotoUrl = profilAktif?.foto_url || null;
+        if (fotoBaruFile) {
+          if (fotoBaruFile.size > BATAS_UKURAN_FOTO) {
+            feedback.textContent = 'Ukuran file terlalu besar. Maksimal 2 MB.';
+            return;
+          }
+          const hasil = await uploadFotoProfil(fotoBaruFile, sessionAktif.user.id);
+          if (hasil.error) {
+            feedback.textContent = 'Gagal upload foto: ' + hasil.error;
+            return;
+          }
+          fotoUrl = hasil.url;
+        }
+
+        const dataBaru = {
+          nama: document.getElementById('edit-nama').value.trim(),
+          bio: document.getElementById('edit-bio').value.trim(),
+          deskripsi: document.getElementById('edit-deskripsi').value.trim(),
+          foto_url: fotoUrl,
+        };
+
+        const { error } = await supabaseClient
+          .from('profiles')
+          .update(dataBaru)
+          .eq('user_id', sessionAktif.user.id);
+
+        if (error) {
+          feedback.textContent = 'Gagal menyimpan: ' + error.message;
           return;
         }
-        const hasil = await uploadFotoProfil(fotoBaruFile, sessionAktif.user.id);
-        if (hasil.error) {
-          feedback.textContent = 'Gagal upload foto: ' + hasil.error;
-          return;
-        }
-        fotoUrl = hasil.url;
+
+        profilAktif = { ...profilAktif, ...dataBaru };
+        tampilkanView(profilAktif, sessionAktif.user.email);
+        document.getElementById('edit-mode').style.display = 'none';
+        feedback.textContent = '';
+      } catch (err) {
+        feedback.textContent = 'Terjadi kesalahan: ' + err.message;
+      } finally {
+        tombolSimpan.disabled = false;
       }
-
-      const dataBaru = {
-        nama: document.getElementById('edit-nama').value.trim(),
-        bio: document.getElementById('edit-bio').value.trim(),
-        deskripsi: document.getElementById('edit-deskripsi').value.trim(),
-        foto_url: fotoUrl,
-      };
-
-      const { error } = await supabaseClient
-        .from('profiles')
-        .update(dataBaru)
-        .eq('user_id', sessionAktif.user.id);
-
-      if (error) {
-        feedback.textContent = 'Gagal menyimpan: ' + error.message;
-        return;
-      }
-
-      profilAktif = { ...profilAktif, ...dataBaru };
-      tampilkanView(profilAktif, sessionAktif.user.email);
-      document.getElementById('edit-mode').style.display = 'none';
-      feedback.textContent = '';
     }
 
     (async () => {
