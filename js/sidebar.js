@@ -7,7 +7,7 @@
 function renderSidebar(activePage) {
   const menu = [
     { key: 'beranda', label: 'Beranda', href: 'index.html', protected: false },
-    { key: 'konten', label: 'Konten', href: 'konten.html', protected: true },
+    { key: 'konten', label: 'Konten', href: 'konten.html', protected: false },
     { key: 'profil', label: 'Profil Saya', href: 'profil.html', protected: true },
   ];
 
