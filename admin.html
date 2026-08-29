@@ -154,15 +154,6 @@
       }
     }
 
-    /** Ambil path file di dalam bucket dari URL publik Supabase Storage */
-    function ambilPathDariUrlPublik(url, bucketName) {
-      if (!url) return null;
-      const penanda = `/public/${bucketName}/`;
-      const idx = url.indexOf(penanda);
-      if (idx === -1) return null;
-      return url.substring(idx + penanda.length);
-    }
-
     async function hapusKonten(id, driveFileId, thumbnailUrl) {
       if (!confirm('Yakin ingin menghapus konten ini?')) return;
 
