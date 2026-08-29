@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beranda</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="page-wrap">
+    <h1>Selamat datang</h1>
+    <p class="text-muted" id="pesan-status"></p>
+
+    <!-- Tampil kalau belum login -->
+    <div id="login-box" class="card" style="max-width:380px; margin-top:24px;">
+      <h2 style="font-size:16px;">Masuk tanpa password</h2>
+      <p class="text-muted" style="margin-bottom:16px;">
+        Masukkan email, kami kirim tautan login ke sana.
+      </p>
+      <input type="email" id="email-input" class="input" placeholder="nama@email.com" style="margin-bottom:12px;">
+      <button class="btn btn-primary" style="width:100%;" onclick="prosesKirimLink()">Kirim Tautan Login</button>
+      <p class="text-muted" id="login-feedback" style="margin-top:12px; margin-bottom:0;"></p>
+    </div>
+
+    <!-- Tampil kalau sudah login -->
+    <div id="welcome-box" class="card" style="max-width:380px; margin-top:24px; display:none;">
+      <p>Kamu sudah login sebagai <b id="welcome-email"></b>.</p>
+      <button class="btn" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/profile-badge.js"></script>
+  <script>
+    renderSidebar('beranda');
+    renderProfileBadge();
+
+    // Tampilkan pesan kalau user diarahkan ke sini karena belum login
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('login') === 'required') {
+      document.getElementById('pesan-status').textContent =
+        'Silakan login dulu untuk mengakses halaman itu.';
+    } else if (params.get('akses') === 'ditolak') {
+      document.getElementById('pesan-status').textContent =
+        'Akun kamu tidak punya akses admin.';
+    }
+
+    async function prosesKirimLink() {
+      const email = document.getElementById('email-input').value.trim();
+      const feedback = document.getElementById('login-feedback');
+      if (!email) {
+        feedback.textContent = 'Masukkan email dulu.';
+        return;
+      }
+      feedback.textContent = 'Mengirim tautan...';
+      const error = await kirimMagicLink(email);
+      feedback.textContent = error ? ('Gagal: ' + error) : 'Cek email kamu, tautan login sudah dikirim.';
+    }
+
+    // Cek status login saat halaman dimuat, sesuaikan tampilan
+    (async () => {
+      const session = await getSession();
+      if (session) {
+        document.getElementById('login-box').style.display = 'none';
+        document.getElementById('welcome-box').style.display = 'block';
+        document.getElementById('welcome-email').textContent = session.user.email;
+      }
+    })();
+  </script>
+</body>
+</html>
