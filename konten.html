@@ -25,7 +25,7 @@
   <script src="js/profile-badge.js"></script>
   <script>
     // GANTI dengan Web app URL hasil deploy apps-script/Code.gs
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyarvjtlVCselntUJDinpIHJ1txCJhhtJ7gPW346jiOKR48dmJ3LjxoBsNb9FCE4FYX/exec';
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyFKT-slhtYwZcjZnxTjtOxTfEHowNyJGf19TC_GysANMnTqFlIUhQmC5bEbl4Gcs18Q/exec';
 
     renderSidebar('konten');
     renderProfileBadge();
@@ -42,15 +42,48 @@
       return div.innerHTML;
     }
 
-    /** Buka tab baru ke proxy Apps Script, sertakan token login user saat ini */
-    async function unduhFile(driveFileId) {
+    /** Ambil file lewat proxy Apps Script (JSON+base64), lalu picu download di browser */
+    async function unduhFile(event, driveFileId) {
       const session = await getSession();
       if (!session) {
         window.location.href = 'index.html?login=required';
         return;
       }
-      const url = `${APPS_SCRIPT_URL}?id=${encodeURIComponent(driveFileId)}&token=${encodeURIComponent(session.access_token)}`;
-      window.open(url, '_blank');
+
+      const tombol = event.currentTarget;
+      const teksAsli = tombol.textContent;
+      tombol.textContent = 'Mengunduh...';
+      tombol.disabled = true;
+
+      try {
+        const url = `${APPS_SCRIPT_URL}?id=${encodeURIComponent(driveFileId)}&token=${encodeURIComponent(session.access_token)}`;
+        const res = await fetch(url);
+        const hasil = await res.json();
+
+        if (hasil.error) {
+          alert('Gagal mengunduh: ' + hasil.error);
+          return;
+        }
+
+        const byteChar = atob(hasil.dataBase64);
+        const bytes = new Uint8Array(byteChar.length);
+        for (let i = 0; i < byteChar.length; i++) bytes[i] = byteChar.charCodeAt(i);
+        const blob = new Blob([bytes], { type: hasil.mimeType || 'application/octet-stream' });
+
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = hasil.fileName || 'file';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        alert('Terjadi kesalahan saat mengunduh: ' + err.message);
+      } finally {
+        tombol.textContent = teksAsli;
+        tombol.disabled = false;
+      }
     }
 
     async function muatKonten() {
@@ -82,7 +115,7 @@
           <div class="content-body">
             <div class="content-judul">${escapeHTML(item.judul)}</div>
             <div class="content-tanggal">${formatTanggal(item.uploaded_at)}</div>
-            <button class="btn btn-primary" onclick="unduhFile('${escapeHTML(item.drive_file_id)}')">
+            <button class="btn btn-primary" onclick="unduhFile(event, '${escapeHTML(item.drive_file_id)}')">
               Download
             </button>
           </div>
