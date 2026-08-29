@@ -141,7 +141,8 @@
       tombolSimpan.disabled = true;
 
       try {
-        let fotoUrl = profilAktif?.foto_url || null;
+        const fotoLama = profilAktif?.foto_url || null;
+        let fotoUrl = fotoLama;
         if (fotoBaruFile) {
           if (fotoBaruFile.size > BATAS_UKURAN_FOTO) {
             feedback.textContent = 'Ukuran file terlalu besar. Maksimal 2 MB.';
@@ -170,6 +171,15 @@
         if (error) {
           feedback.textContent = 'Gagal menyimpan: ' + error.message;
           return;
+        }
+
+        // Hapus foto lama supaya tidak jadi file "sampah" di storage
+        if (fotoBaruFile && fotoLama) {
+          const pathLama = ambilPathDariUrlPublik(fotoLama, 'avatars');
+          if (pathLama) {
+            const { error: errHapusLama } = await supabaseClient.storage.from('avatars').remove([pathLama]);
+            if (errHapusLama) console.warn('Gagal menghapus foto lama:', errHapusLama.message);
+          }
         }
 
         profilAktif = { ...profilAktif, ...dataBaru };
