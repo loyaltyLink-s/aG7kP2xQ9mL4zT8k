@@ -154,7 +154,16 @@
       }
     }
 
-    async function hapusKonten(id, driveFileId) {
+    /** Ambil path file di dalam bucket dari URL publik Supabase Storage */
+    function ambilPathDariUrlPublik(url, bucketName) {
+      if (!url) return null;
+      const penanda = `/public/${bucketName}/`;
+      const idx = url.indexOf(penanda);
+      if (idx === -1) return null;
+      return url.substring(idx + penanda.length);
+    }
+
+    async function hapusKonten(id, driveFileId, thumbnailUrl) {
       if (!confirm('Yakin ingin menghapus konten ini?')) return;
 
       const hasilHapus = await panggilAppsScript({
@@ -165,6 +174,17 @@
       if (hasilHapus.error) {
         alert('Gagal menghapus file di Drive: ' + hasilHapus.error);
         return;
+      }
+
+      // Hapus juga thumbnail dari Supabase Storage supaya tidak jadi file "sampah"
+      const pathThumbnail = ambilPathDariUrlPublik(thumbnailUrl, 'thumbnails');
+      if (pathThumbnail) {
+        const { error: errStorage } = await supabaseClient.storage
+          .from('thumbnails')
+          .remove([pathThumbnail]);
+        if (errStorage) {
+          console.warn('Gagal menghapus thumbnail dari storage:', errStorage.message);
+        }
       }
 
       const { error } = await supabaseClient.from('konten').delete().eq('id', id);
@@ -204,7 +224,7 @@
             <div class="admin-row-judul">${escapeHTML(item.judul)}</div>
             <div class="admin-row-tanggal">${formatTanggal(item.uploaded_at)}</div>
           </div>
-          <button class="btn btn-danger" onclick="hapusKonten('${item.id}', '${escapeHTML(item.drive_file_id)}')">
+          <button class="btn btn-danger" onclick="hapusKonten('${item.id}', '${escapeHTML(item.drive_file_id)}', '${escapeHTML(item.thumbnail_url)}')">
             Hapus
           </button>
         </div>
