@@ -36,6 +36,20 @@
       <p class="progress-text" id="upload-feedback" style="margin-top:12px;"></p>
     </div>
 
+    <!-- Pengumuman -->
+    <div class="card" style="margin-top:24px;">
+      <h2 style="font-size:16px;">Pengumuman (otomatis hilang setelah 24 jam)</h2>
+
+      <div id="pengumuman-aktif" style="margin-top:10px;"></div>
+
+      <div class="profile-field" style="margin-top:14px;">
+        <label>Tulis pengumuman baru (boleh sertakan link)</label>
+        <textarea id="input-pengumuman" class="input" placeholder="Contoh: Server maintenance jam 22.00, cek detail di https://..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="prosesPostingPengumuman()">Posting</button>
+      <p class="progress-text" id="pengumuman-feedback" style="margin-top:10px;"></p>
+    </div>
+
     <!-- Daftar konten -->
     <div class="card" style="margin-top:24px;">
       <h2 style="font-size:16px;">Konten Tersimpan</h2>
@@ -226,11 +240,82 @@
       `).join('');
     }
 
+    /** Ubah URL polos jadi tautan yang bisa diklik, sisanya tetap aman (di-escape) */
+    function formatTeksPengumuman(teks) {
+      const escaped = escapeHTML(teks);
+      return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) =>
+        `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+      );
+    }
+
+    async function muatPengumumanAdmin() {
+      const batasWaktu = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabaseClient
+        .from('pengumuman')
+        .select('*')
+        .gt('created_at', batasWaktu)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const slot = document.getElementById('pengumuman-aktif');
+      if (!data || data.length === 0) {
+        slot.innerHTML = '<p class="text-muted">Tidak ada pengumuman aktif saat ini.</p>';
+        return;
+      }
+
+      slot.innerHTML = `
+        <div class="pengumuman-banner">
+          ${formatTeksPengumuman(data[0].isi)}
+        </div>
+        <button class="btn btn-danger" style="margin-top:8px;" onclick="hapusPengumuman('${data[0].id}')">
+          Hapus Sekarang
+        </button>
+      `;
+    }
+
+    async function prosesPostingPengumuman() {
+      const feedback = document.getElementById('pengumuman-feedback');
+      const isi = document.getElementById('input-pengumuman').value.trim();
+      if (!isi) {
+        feedback.textContent = 'Isi pengumuman tidak boleh kosong.';
+        return;
+      }
+
+      feedback.textContent = 'Memposting...';
+      try {
+        // Hapus pengumuman lama dulu supaya cuma ada 1 yang aktif
+        await supabaseClient.from('pengumuman').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+        const { error } = await supabaseClient.from('pengumuman').insert({
+          isi,
+          created_by: sessionAdmin.user.id,
+        });
+        if (error) throw new Error(error.message);
+
+        document.getElementById('input-pengumuman').value = '';
+        feedback.textContent = 'Pengumuman berhasil diposting.';
+        await muatPengumumanAdmin();
+      } catch (err) {
+        feedback.textContent = 'Gagal memposting: ' + err.message;
+      }
+    }
+
+    async function hapusPengumuman(id) {
+      if (!confirm('Hapus pengumuman ini sekarang?')) return;
+      const { error } = await supabaseClient.from('pengumuman').delete().eq('id', id);
+      if (error) {
+        alert('Gagal menghapus: ' + error.message);
+        return;
+      }
+      await muatPengumumanAdmin();
+    }
+
     (async () => {
       const hasil = await requireAdmin();
       if (!hasil) return; // sudah di-redirect oleh requireAdmin()
       sessionAdmin = hasil.session;
       await muatDaftarKonten();
+      await muatPengumumanAdmin();
     })();
   </script>
 </body>
