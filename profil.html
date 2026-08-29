@@ -81,7 +81,7 @@
     function tampilkanView(profile, email) {
       document.getElementById('view-foto').src = profile?.foto_url || 'assets/default-avatar.png';
       document.getElementById('view-nama').textContent = profile?.nama || email;
-      document.getElementById('view-level').textContent = profile?.level || 'Member';
+      document.getElementById('view-level').textContent = profile?.is_admin ? 'Admin' : (profile?.level || 'Member');
       document.getElementById('view-bio').textContent = profile?.bio || 'Belum ada bio.';
       document.getElementById('view-deskripsi').textContent = profile?.deskripsi || 'Belum ada deskripsi.';
       document.getElementById('view-mode').style.display = 'block';
