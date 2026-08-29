@@ -157,33 +157,37 @@
     async function hapusKonten(id, driveFileId, thumbnailUrl) {
       if (!confirm('Yakin ingin menghapus konten ini?')) return;
 
-      const hasilHapus = await panggilAppsScript({
-        action: 'delete',
-        token: sessionAdmin.access_token,
-        fileId: driveFileId,
-      });
-      if (hasilHapus.error) {
-        alert('Gagal menghapus file di Drive: ' + hasilHapus.error);
-        return;
-      }
-
-      // Hapus juga thumbnail dari Supabase Storage supaya tidak jadi file "sampah"
-      const pathThumbnail = ambilPathDariUrlPublik(thumbnailUrl, 'thumbnails');
-      if (pathThumbnail) {
-        const { error: errStorage } = await supabaseClient.storage
-          .from('thumbnails')
-          .remove([pathThumbnail]);
-        if (errStorage) {
-          console.warn('Gagal menghapus thumbnail dari storage:', errStorage.message);
+      try {
+        const hasilHapus = await panggilAppsScript({
+          action: 'delete',
+          token: sessionAdmin.access_token,
+          fileId: driveFileId,
+        });
+        if (hasilHapus.error) {
+          alert('Gagal menghapus file di Drive: ' + hasilHapus.error);
+          return;
         }
-      }
 
-      const { error } = await supabaseClient.from('konten').delete().eq('id', id);
-      if (error) {
-        alert('File Drive terhapus, tapi gagal menghapus data: ' + error.message);
-        return;
+        // Hapus juga thumbnail dari Supabase Storage supaya tidak jadi file "sampah"
+        const pathThumbnail = ambilPathDariUrlPublik(thumbnailUrl, 'thumbnails');
+        if (pathThumbnail) {
+          const { error: errStorage } = await supabaseClient.storage
+            .from('thumbnails')
+            .remove([pathThumbnail]);
+          if (errStorage) {
+            console.warn('Gagal menghapus thumbnail dari storage:', errStorage.message);
+          }
+        }
+
+        const { error } = await supabaseClient.from('konten').delete().eq('id', id);
+        if (error) {
+          alert('File Drive terhapus, tapi gagal menghapus data: ' + error.message);
+          return;
+        }
+        await muatDaftarKonten();
+      } catch (err) {
+        alert('Terjadi kesalahan: ' + err.message);
       }
-      await muatDaftarKonten();
     }
 
     async function muatDaftarKonten() {
