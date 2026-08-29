@@ -460,3 +460,31 @@ input[type="file"]::-webkit-file-upload-button:active {
   font-size: 13px;
   color: var(--accent-cyan);
 }
+
+/* ==========================================================
+   PENGUMUMAN
+   ========================================================== */
+.pengumuman-banner {
+  position: relative;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-violet);
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pengumuman-banner a {
+  color: var(--accent-cyan);
+  text-decoration: underline;
+}
+.pengumuman-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-violet);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
