@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Loyalty - Beranda</title>
+  <title>Beranda</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
   <div class="page-wrap">
+    <div id="pengumuman-slot"></div>
+
     <h1>Selamat datang</h1>
     <p class="text-muted" id="pesan-status"></p>
 
@@ -37,6 +39,37 @@
   <script>
     renderSidebar('beranda');
     renderProfileBadge();
+    muatPengumuman();
+
+    /** Ubah URL polos jadi tautan yang bisa diklik, sisanya tetap aman (di-escape) */
+    function formatTeksPengumuman(teks) {
+      const aman = document.createElement('div');
+      aman.textContent = teks;
+      const escaped = aman.innerHTML;
+      return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) =>
+        `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+      );
+    }
+
+    async function muatPengumuman() {
+      const batasWaktu = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabaseClient
+        .from('pengumuman')
+        .select('*')
+        .gt('created_at', batasWaktu)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error || !data || data.length === 0) return;
+
+      const slot = document.getElementById('pengumuman-slot');
+      slot.innerHTML = `
+        <div class="pengumuman-banner">
+          <span class="pengumuman-label">Pengumuman</span>
+          ${formatTeksPengumuman(data[0].isi)}
+        </div>
+      `;
+    }
 
     // Tampilkan pesan kalau user diarahkan ke sini karena belum login
     const params = new URLSearchParams(window.location.search);
