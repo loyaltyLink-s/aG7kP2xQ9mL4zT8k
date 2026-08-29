@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profil Saya</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="page-wrap" style="max-width: 560px;">
+    <h1>Profil Saya</h1>
+
+    <!-- Tampilan biasa -->
+    <div id="view-mode" class="card" style="display:none;">
+      <div class="profile-header">
+        <img id="view-foto" class="avatar-large" src="assets/default-avatar.png" alt="Foto profil">
+        <div>
+          <h2 id="view-nama" style="font-size:18px; margin-bottom:4px;"></h2>
+          <span id="view-level" class="level-badge"></span>
+        </div>
+      </div>
+
+      <div class="profile-field">
+        <label>Bio</label>
+        <p id="view-bio" class="text-muted">—</p>
+      </div>
+
+      <div class="profile-field">
+        <label>Deskripsi Akun</label>
+        <p id="view-deskripsi" class="text-muted">—</p>
+      </div>
+
+      <button class="btn btn-primary" onclick="masukModeEdit()">Edit Profil</button>
+    </div>
+
+    <!-- Tampilan edit -->
+    <div id="edit-mode" class="card" style="display:none;">
+      <div class="profile-field">
+        <label>Foto Profil</label>
+        <div class="file-input-wrap">
+          <img id="edit-foto-preview" class="avatar-large" style="width:56px; height:56px;" src="assets/default-avatar.png" alt="Pratinjau foto">
+          <input type="file" id="edit-foto-input" accept="image/*">
+        </div>
+      </div>
+
+      <div class="profile-field">
+        <label>Nama</label>
+        <input type="text" id="edit-nama" class="input">
+      </div>
+
+      <div class="profile-field">
+        <label>Bio</label>
+        <textarea id="edit-bio" class="input"></textarea>
+      </div>
+
+      <div class="profile-field">
+        <label>Deskripsi Akun</label>
+        <textarea id="edit-deskripsi" class="input"></textarea>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-primary" onclick="simpanProfil()">Simpan Perubahan</button>
+        <button class="btn" onclick="batalEdit()">Batal</button>
+      </div>
+      <p class="text-muted" id="edit-feedback" style="margin-top:12px; margin-bottom:0;"></p>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script>
+    renderSidebar('profil');
+    // Catatan: badge profil TIDAK ditampilkan di halaman ini (sesuai desain)
+
+    let sessionAktif = null;
+    let profilAktif = null;
+    let fotoBaruFile = null;
+
+    function tampilkanView(profile, email) {
+      document.getElementById('view-foto').src = profile?.foto_url || 'assets/default-avatar.png';
+      document.getElementById('view-nama').textContent = profile?.nama || email;
+      document.getElementById('view-level').textContent = profile?.level || 'Member';
+      document.getElementById('view-bio').textContent = profile?.bio || 'Belum ada bio.';
+      document.getElementById('view-deskripsi').textContent = profile?.deskripsi || 'Belum ada deskripsi.';
+      document.getElementById('view-mode').style.display = 'block';
+    }
+
+    function masukModeEdit() {
+      document.getElementById('edit-nama').value = profilAktif?.nama || '';
+      document.getElementById('edit-bio').value = profilAktif?.bio || '';
+      document.getElementById('edit-deskripsi').value = profilAktif?.deskripsi || '';
+      document.getElementById('edit-foto-preview').src = profilAktif?.foto_url || 'assets/default-avatar.png';
+      fotoBaruFile = null;
+      document.getElementById('view-mode').style.display = 'none';
+      document.getElementById('edit-mode').style.display = 'block';
+    }
+
+    function batalEdit() {
+      document.getElementById('edit-mode').style.display = 'none';
+      document.getElementById('view-mode').style.display = 'block';
+      document.getElementById('edit-feedback').textContent = '';
+    }
+
+    const BATAS_UKURAN_FOTO = 2 * 1024 * 1024; // 2 MB
+    const TIPE_FOTO_DIIZINKAN = ['image/jpeg', 'image/png', 'image/webp'];
+
+    document.getElementById('edit-foto-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const feedback = document.getElementById('edit-feedback');
+      if (!file) return;
+
+      if (!TIPE_FOTO_DIIZINKAN.includes(file.type)) {
+        feedback.textContent = 'Format tidak didukung. Gunakan JPG, PNG, atau WEBP.';
+        e.target.value = '';
+        fotoBaruFile = null;
+        return;
+      }
+
+      if (file.size > BATAS_UKURAN_FOTO) {
+        feedback.textContent = 'Ukuran file terlalu besar. Maksimal 2 MB.';
+        e.target.value = '';
+        fotoBaruFile = null;
+        return;
+      }
+
+      feedback.textContent = '';
+      fotoBaruFile = file;
+      document.getElementById('edit-foto-preview').src = URL.createObjectURL(file);
+    });
+
+    async function simpanProfil() {
+      const feedback = document.getElementById('edit-feedback');
+      feedback.textContent = 'Menyimpan...';
+
+      let fotoUrl = profilAktif?.foto_url || null;
+      if (fotoBaruFile) {
+        if (fotoBaruFile.size > BATAS_UKURAN_FOTO) {
+          feedback.textContent = 'Ukuran file terlalu besar. Maksimal 2 MB.';
+          return;
+        }
+        const hasil = await uploadFotoProfil(fotoBaruFile, sessionAktif.user.id);
+        if (hasil.error) {
+          feedback.textContent = 'Gagal upload foto: ' + hasil.error;
+          return;
+        }
+        fotoUrl = hasil.url;
+      }
+
+      const dataBaru = {
+        nama: document.getElementById('edit-nama').value.trim(),
+        bio: document.getElementById('edit-bio').value.trim(),
+        deskripsi: document.getElementById('edit-deskripsi').value.trim(),
+        foto_url: fotoUrl,
+      };
+
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update(dataBaru)
+        .eq('user_id', sessionAktif.user.id);
+
+      if (error) {
+        feedback.textContent = 'Gagal menyimpan: ' + error.message;
+        return;
+      }
+
+      profilAktif = { ...profilAktif, ...dataBaru };
+      tampilkanView(profilAktif, sessionAktif.user.email);
+      document.getElementById('edit-mode').style.display = 'none';
+      feedback.textContent = '';
+    }
+
+    (async () => {
+      const session = await requireAuth();
+      if (!session) return; // sudah di-redirect oleh requireAuth()
+
+      sessionAktif = session;
+      profilAktif = await getProfile(session.user.id);
+      tampilkanView(profilAktif, session.user.email);
+    })();
+  </script>
+</body>
+</html>

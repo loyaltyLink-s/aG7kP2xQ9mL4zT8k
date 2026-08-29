@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Konten</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div class="page-wrap">
+    <h1>Konten</h1>
+    <p class="text-muted">Semua file yang tersedia untuk diunduh.</p>
+
+    <div id="loading-state" class="empty-state">Memuat konten...</div>
+    <div id="content-grid" class="content-grid"></div>
+    <div id="empty-state" class="empty-state" style="display:none;">
+      Belum ada konten yang tersedia.
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/profile-badge.js"></script>
+  <script>
+    // GANTI dengan Web app URL hasil deploy apps-script/Code.gs
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyarvjtlVCselntUJDinpIHJ1txCJhhtJ7gPW346jiOKR48dmJ3LjxoBsNb9FCE4FYX/exec';
+
+    renderSidebar('konten');
+    renderProfileBadge();
+
+    function formatTanggal(iso) {
+      return new Date(iso).toLocaleDateString('id-ID', {
+        day: 'numeric', month: 'long', year: 'numeric',
+      });
+    }
+
+    function escapeHTML(teks) {
+      const div = document.createElement('div');
+      div.textContent = teks ?? '';
+      return div.innerHTML;
+    }
+
+    /** Buka tab baru ke proxy Apps Script, sertakan token login user saat ini */
+    async function unduhFile(driveFileId) {
+      const session = await getSession();
+      if (!session) {
+        window.location.href = 'index.html?login=required';
+        return;
+      }
+      const url = `${APPS_SCRIPT_URL}?id=${encodeURIComponent(driveFileId)}&token=${encodeURIComponent(session.access_token)}`;
+      window.open(url, '_blank');
+    }
+
+    async function muatKonten() {
+      const { data, error } = await supabaseClient
+        .from('konten')
+        .select('*')
+        .order('uploaded_at', { ascending: false });
+
+      const grid = document.getElementById('content-grid');
+      const emptyState = document.getElementById('empty-state');
+      const loadingState = document.getElementById('loading-state');
+      loadingState.style.display = 'none';
+
+      if (error) {
+        grid.innerHTML = `<p class="text-muted">Gagal memuat konten: ${escapeHTML(error.message)}</p>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      grid.innerHTML = data.map(item => `
+        <div class="content-card">
+          <img class="content-thumb" src="${escapeHTML(item.thumbnail_url) || 'assets/default-thumb.png'}"
+               alt="${escapeHTML(item.judul)}"
+               onerror="this.onerror=null; this.src='assets/default-thumb.png';">
+          <div class="content-body">
+            <div class="content-judul">${escapeHTML(item.judul)}</div>
+            <div class="content-tanggal">${formatTanggal(item.uploaded_at)}</div>
+            <button class="btn btn-primary" onclick="unduhFile('${escapeHTML(item.drive_file_id)}')">
+              Download
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    (async () => {
+      const session = await requireAuth();
+      if (!session) return; // sudah di-redirect oleh requireAuth()
+      await muatKonten();
+    })();
+  </script>
+</body>
+</html>
