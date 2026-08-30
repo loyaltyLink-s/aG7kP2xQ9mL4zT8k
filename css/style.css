@@ -488,3 +488,150 @@ input[type="file"]::-webkit-file-upload-button:active {
   margin-bottom: 4px;
   font-weight: 600;
 }
+
+/* ==========================================================
+   KOMENTAR
+   ========================================================== */
+.komentar-panel {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.komentar-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.komentar-item:last-of-type { border-bottom: none; }
+
+.komentar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.komentar-user img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface);
+}
+.komentar-user span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.komentar-isi {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  word-break: break-word;
+}
+.komentar-isi a { color: var(--accent-cyan); text-decoration: underline; }
+
+.btn-hapus-komentar {
+  background: none;
+  border: none;
+  color: var(--accent-pink);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.btn-hapus-komentar:hover { text-decoration: underline; }
+
+.komentar-form {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.komentar-form textarea {
+  min-height: 50px;
+  font-size: 13px;
+}
+
+.content-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.btn-icon:hover { border-color: var(--accent-violet); }
+.btn-icon.active-suka {
+  color: var(--accent-pink);
+  border-color: var(--accent-pink);
+}
+.btn-icon.active-favorit {
+  color: #ffd166;
+  border-color: #ffd166;
+}
+
+.komentar-aksi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.btn-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.btn-vote:hover { color: var(--text); }
+.btn-vote.active-suka { color: var(--accent-cyan); }
+.btn-vote.active-tidak-suka { color: var(--accent-pink); }
+
+.btn-teks-kecil {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.btn-teks-kecil:hover { color: var(--text); text-decoration: underline; }
+
+.form-balas {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-balas textarea {
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.daftar-balasan {
+  margin-top: 10px;
+  margin-left: 20px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.komentar-balasan { padding: 0; border-bottom: none; }
