@@ -1,5 +1,5 @@
 /* ==========================================================
-   auth.js — Inisialisasi Supabase, Magic Link, dan
+   auth.js — Inisialisasi Supabase, Magic Link, GitHub OAuth, dan
    fungsi bantu untuk melindungi halaman
    ========================================================== */
 
@@ -18,6 +18,21 @@ async function kirimMagicLink(email) {
     email,
     options: {
       emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]+$/, 'index.html'),
+    },
+  });
+  return error ? error.message : null;
+}
+
+/**
+ * Login menggunakan akun GitHub (OAuth via Supabase).
+ * Browser akan diarahkan ke GitHub, lalu balik lagi ke index.html.
+ * Return: null kalau proses redirect berhasil dimulai, atau pesan error (string).
+ */
+async function loginDenganGitHub() {
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: 'github',
+    options: {
+      redirectTo: window.location.origin + window.location.pathname.replace(/[^/]+$/, 'index.html'),
     },
   });
   return error ? error.message : null;
