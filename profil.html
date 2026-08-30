@@ -10,7 +10,7 @@
 <body>
 
   <div class="page-wrap" style="max-width: 560px;">
-    <h1>Profil Saya</h1>
+    <h1 id="judul-halaman">Profil Saya</h1>
 
     <!-- Tampilan biasa -->
     <div id="view-mode" class="card" style="display:none;">
@@ -32,7 +32,7 @@
         <p id="view-deskripsi" class="text-muted">—</p>
       </div>
 
-      <button class="btn btn-primary" onclick="masukModeEdit()">Edit Profil</button>
+      <button class="btn btn-primary" id="btn-edit-profil" onclick="masukModeEdit()">Edit Profil</button>
     </div>
 
     <!-- Tampilan edit -->
@@ -198,8 +198,22 @@
       if (!session) return; // sudah di-redirect oleh requireAuth()
 
       sessionAktif = session;
-      profilAktif = await getProfile(session.user.id);
-      tampilkanView(profilAktif, session.user.email);
+
+      const params = new URLSearchParams(window.location.search);
+      const idYangDilihat = params.get('user') || session.user.id;
+      const milikSendiri = idYangDilihat === session.user.id;
+
+      profilAktif = await getProfile(idYangDilihat);
+
+      if (!profilAktif) {
+        document.getElementById('judul-halaman').textContent = 'Profil tidak ditemukan';
+        return;
+      }
+
+      document.getElementById('judul-halaman').textContent = milikSendiri ? 'Profil Saya' : `Profil ${profilAktif.nama || 'Pengguna'}`;
+      document.getElementById('btn-edit-profil').style.display = milikSendiri ? 'inline-flex' : 'none';
+
+      tampilkanView(profilAktif, milikSendiri ? session.user.email : profilAktif.nama);
     })();
   </script>
 </body>
