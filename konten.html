@@ -86,6 +86,22 @@
       }
     }
 
+    /** Ambil konten_id yang sudah disuka/difavoritkan oleh user yang sedang login */
+    async function ambilStatusUser(daftarId) {
+      const session = await getSession();
+      if (!session || daftarId.length === 0) return { suka: new Set(), favorit: new Set() };
+
+      const [{ data: sukaData }, { data: favData }] = await Promise.all([
+        supabaseClient.from('suka').select('konten_id').eq('user_id', session.user.id).in('konten_id', daftarId),
+        supabaseClient.from('favorit').select('konten_id').eq('user_id', session.user.id).in('konten_id', daftarId),
+      ]);
+
+      return {
+        suka: new Set((sukaData || []).map((s) => s.konten_id)),
+        favorit: new Set((favData || []).map((f) => f.konten_id)),
+      };
+    }
+
     async function muatKonten() {
       const { data, error } = await supabaseClient
         .from('konten')
@@ -107,6 +123,8 @@
         return;
       }
 
+      const status = await ambilStatusUser(data.map((item) => item.id));
+
       grid.innerHTML = data.map(item => `
         <div class="content-card">
           <img class="content-thumb" src="${escapeHTML(item.thumbnail_url) || 'assets/default-thumb.png'}"
@@ -118,9 +136,294 @@
             <button class="btn btn-primary" onclick="unduhFile(event, '${escapeHTML(item.drive_file_id)}')">
               Download
             </button>
+            <div class="content-actions">
+              <button class="btn-icon ${status.suka.has(item.id) ? 'active-suka' : ''}" onclick="toggleSuka(event, '${item.id}')">
+                ❤ <span id="jumlah-suka-${item.id}">${item.jumlah_suka || 0}</span>
+              </button>
+              <button class="btn-icon ${status.favorit.has(item.id) ? 'active-favorit' : ''}" onclick="toggleFavorit(event, '${item.id}')">
+                ★ <span id="jumlah-favorit-${item.id}">${item.jumlah_favorit || 0}</span>
+              </button>
+              <button class="btn-icon" onclick="toggleKomentar(event, '${item.id}')">
+                💬 <span id="jumlah-komentar-${item.id}">${item.jumlah_komentar || 0}</span>
+              </button>
+            </div>
           </div>
+          <div class="komentar-panel" id="komentar-${item.id}" style="display:none;"></div>
         </div>
       `).join('');
+    }
+
+    async function toggleSuka(event, kontenId) {
+      const session = await getSession();
+      if (!session) {
+        window.location.href = 'index.html?login=required';
+        return;
+      }
+
+      const tombol = event.currentTarget;
+      const sudahSuka = tombol.classList.contains('active-suka');
+      const span = document.getElementById(`jumlah-suka-${kontenId}`);
+      tombol.disabled = true;
+
+      try {
+        if (sudahSuka) {
+          const { error } = await supabaseClient.from('suka').delete()
+            .eq('konten_id', kontenId).eq('user_id', session.user.id);
+          if (error) throw new Error(error.message);
+          tombol.classList.remove('active-suka');
+          span.textContent = Math.max((parseInt(span.textContent, 10) || 0) - 1, 0);
+        } else {
+          const { error } = await supabaseClient.from('suka').insert({ konten_id: kontenId, user_id: session.user.id });
+          if (error) throw new Error(error.message);
+          tombol.classList.add('active-suka');
+          span.textContent = (parseInt(span.textContent, 10) || 0) + 1;
+        }
+      } catch (err) {
+        alert('Gagal memproses suka: ' + err.message);
+      } finally {
+        tombol.disabled = false;
+      }
+    }
+
+    async function toggleFavorit(event, kontenId) {
+      const session = await getSession();
+      if (!session) {
+        window.location.href = 'index.html?login=required';
+        return;
+      }
+
+      const tombol = event.currentTarget;
+      const sudahFavorit = tombol.classList.contains('active-favorit');
+      const span = document.getElementById(`jumlah-favorit-${kontenId}`);
+      tombol.disabled = true;
+
+      try {
+        if (sudahFavorit) {
+          const { error } = await supabaseClient.from('favorit').delete()
+            .eq('konten_id', kontenId).eq('user_id', session.user.id);
+          if (error) throw new Error(error.message);
+          tombol.classList.remove('active-favorit');
+          span.textContent = Math.max((parseInt(span.textContent, 10) || 0) - 1, 0);
+        } else {
+          const { error } = await supabaseClient.from('favorit').insert({ konten_id: kontenId, user_id: session.user.id });
+          if (error) throw new Error(error.message);
+          tombol.classList.add('active-favorit');
+          span.textContent = (parseInt(span.textContent, 10) || 0) + 1;
+        }
+      } catch (err) {
+        alert('Gagal memproses favorit: ' + err.message);
+      } finally {
+        tombol.disabled = false;
+      }
+    }
+
+    /** Ubah URL polos jadi tautan yang bisa diklik, sisanya tetap aman (di-escape) */
+    function linkifyDanEscape(teks) {
+      const escaped = escapeHTML(teks);
+      return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) =>
+        `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+      );
+    }
+
+    async function toggleKomentar(event, kontenId) {
+      const panel = document.getElementById(`komentar-${kontenId}`);
+      const sedangTerbuka = panel.style.display === 'block';
+      panel.style.display = sedangTerbuka ? 'none' : 'block';
+      if (!sedangTerbuka && !panel.dataset.dimuat) {
+        panel.dataset.dimuat = '1';
+        await muatKomentar(kontenId);
+      }
+    }
+
+    async function muatKomentar(kontenId) {
+      const panel = document.getElementById(`komentar-${kontenId}`);
+      panel.innerHTML = '<p class="text-muted">Memuat komentar...</p>';
+
+      const { data, error } = await supabaseClient
+        .from('komentar')
+        .select('*, profiles(nama, foto_url)')
+        .eq('konten_id', kontenId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        panel.innerHTML = `<p class="text-muted">Gagal memuat komentar: ${escapeHTML(error.message)}</p>`;
+        return;
+      }
+
+      const session = await getSession();
+      const profilSaya = session ? await getProfile(session.user.id) : null;
+
+      const semuaId = (data || []).map((k) => k.id);
+      const voteSaya = {};
+      if (session && semuaId.length > 0) {
+        const { data: voteData } = await supabaseClient
+          .from('komentar_suka')
+          .select('komentar_id, nilai')
+          .eq('user_id', session.user.id)
+          .in('komentar_id', semuaId);
+        (voteData || []).forEach((v) => { voteSaya[v.komentar_id] = v.nilai; });
+      }
+
+      const top = (data || []).filter((k) => !k.parent_id);
+      const balasanMap = {};
+      (data || []).filter((k) => k.parent_id).forEach((k) => {
+        if (!balasanMap[k.parent_id]) balasanMap[k.parent_id] = [];
+        balasanMap[k.parent_id].push(k);
+      });
+
+      function renderSatuKomentar(k, adalahBalasan) {
+        const nama = k.profiles?.nama || 'Pengguna';
+        const foto = k.profiles?.foto_url || 'assets/default-avatar.png';
+        const bolehHapus = session && (session.user.id === k.user_id || profilSaya?.is_admin);
+        const nilaiSaya = voteSaya[k.id];
+        return `
+          <div class="komentar-item ${adalahBalasan ? 'komentar-balasan' : ''}">
+            <a href="profil.html?user=${k.user_id}" class="komentar-user">
+              <img src="${escapeHTML(foto)}" alt="${escapeHTML(nama)}">
+              <span>${escapeHTML(nama)}</span>
+            </a>
+            <p class="komentar-isi">${linkifyDanEscape(k.isi)}</p>
+            <div class="komentar-aksi">
+              <button class="btn-vote ${nilaiSaya === 1 ? 'active-suka' : ''}" onclick="voteKomentar(event, '${k.id}', 1)">
+                👍 <span id="suka-komentar-${k.id}">${k.jumlah_suka || 0}</span>
+              </button>
+              <button class="btn-vote ${nilaiSaya === -1 ? 'active-tidak-suka' : ''}" onclick="voteKomentar(event, '${k.id}', -1)">
+                👎 <span id="tidak-suka-komentar-${k.id}">${k.jumlah_tidak_suka || 0}</span>
+              </button>
+              ${!adalahBalasan ? `<button class="btn-teks-kecil" onclick="toggleFormBalas('${k.id}')">Balas</button>` : ''}
+              ${bolehHapus ? `<button class="btn-hapus-komentar" onclick="hapusKomentar('${k.id}', '${kontenId}')">Hapus</button>` : ''}
+            </div>
+            ${!adalahBalasan ? `
+              <div class="form-balas" id="form-balas-${k.id}" style="display:none;">
+                <textarea class="input" id="input-balas-${k.id}" placeholder="Tulis balasan..."></textarea>
+                <button class="btn btn-primary" onclick="kirimBalasan('${kontenId}', '${k.id}')">Kirim Balasan</button>
+              </div>
+              ${balasanMap[k.id] ? `<div class="daftar-balasan">${balasanMap[k.id].map((b) => renderSatuKomentar(b, true)).join('')}</div>` : ''}
+            ` : ''}
+          </div>
+        `;
+      }
+
+      const daftarHTML = top.map((k) => renderSatuKomentar(k, false)).join('') || '<p class="text-muted">Belum ada komentar.</p>';
+
+      const formHTML = session ? `
+        <div class="komentar-form">
+          <textarea class="input" id="input-komentar-${kontenId}" placeholder="Tulis komentar..."></textarea>
+          <button class="btn btn-primary" onclick="kirimKomentar('${kontenId}')">Kirim</button>
+        </div>
+      ` : `<p class="text-muted" style="margin-top:8px;">
+             <a href="index.html?login=required" style="color:var(--accent-cyan);">Login</a> untuk ikut berkomentar.
+           </p>`;
+
+      panel.innerHTML = daftarHTML + formHTML;
+    }
+
+    function toggleFormBalas(komentarId) {
+      const form = document.getElementById(`form-balas-${komentarId}`);
+      form.style.display = form.style.display === 'block' ? 'none' : 'block';
+    }
+
+    async function kirimBalasan(kontenId, parentId) {
+      const session = await getSession();
+      if (!session) {
+        window.location.href = 'index.html?login=required';
+        return;
+      }
+
+      const textarea = document.getElementById(`input-balas-${parentId}`);
+      const isi = textarea.value.trim();
+      if (!isi) return;
+
+      const { error } = await supabaseClient.from('komentar').insert({
+        konten_id: kontenId,
+        user_id: session.user.id,
+        parent_id: parentId,
+        isi,
+      });
+      if (error) {
+        alert('Gagal mengirim balasan: ' + error.message);
+        return;
+      }
+
+      const spanJumlah = document.getElementById(`jumlah-komentar-${kontenId}`);
+      if (spanJumlah) spanJumlah.textContent = (parseInt(spanJumlah.textContent, 10) || 0) + 1;
+      await muatKomentar(kontenId);
+    }
+
+    async function voteKomentar(event, komentarId, nilai) {
+      const session = await getSession();
+      if (!session) {
+        window.location.href = 'index.html?login=required';
+        return;
+      }
+
+      const tombol = event.currentTarget;
+      tombol.disabled = true;
+
+      try {
+        const { data: existing } = await supabaseClient
+          .from('komentar_suka')
+          .select('*')
+          .eq('komentar_id', komentarId)
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (existing && existing.nilai === nilai) {
+          const { error } = await supabaseClient.from('komentar_suka').delete().eq('id', existing.id);
+          if (error) throw new Error(error.message);
+        } else if (existing) {
+          const { error } = await supabaseClient.from('komentar_suka').update({ nilai }).eq('id', existing.id);
+          if (error) throw new Error(error.message);
+        } else {
+          const { error } = await supabaseClient.from('komentar_suka').insert({ komentar_id: komentarId, user_id: session.user.id, nilai });
+          if (error) throw new Error(error.message);
+        }
+
+        const panelTerkait = tombol.closest('.komentar-panel');
+        const kontenId = panelTerkait.id.replace('komentar-', '');
+        await muatKomentar(kontenId);
+      } catch (err) {
+        alert('Gagal memproses vote: ' + err.message);
+      } finally {
+        tombol.disabled = false;
+      }
+    }
+
+    async function kirimKomentar(kontenId) {
+      const session = await getSession();
+      if (!session) {
+        window.location.href = 'index.html?login=required';
+        return;
+      }
+
+      const textarea = document.getElementById(`input-komentar-${kontenId}`);
+      const isi = textarea.value.trim();
+      if (!isi) return;
+
+      const { error } = await supabaseClient.from('komentar').insert({
+        konten_id: kontenId,
+        user_id: session.user.id,
+        isi,
+      });
+      if (error) {
+        alert('Gagal mengirim komentar: ' + error.message);
+        return;
+      }
+      const spanJumlah = document.getElementById(`jumlah-komentar-${kontenId}`);
+      if (spanJumlah) spanJumlah.textContent = (parseInt(spanJumlah.textContent, 10) || 0) + 1;
+      await muatKomentar(kontenId);
+    }
+
+    async function hapusKomentar(id, kontenId) {
+      if (!confirm('Hapus komentar ini?')) return;
+      const { error } = await supabaseClient.from('komentar').delete().eq('id', id);
+      if (error) {
+        alert('Gagal menghapus: ' + error.message);
+        return;
+      }
+      const spanJumlah = document.getElementById(`jumlah-komentar-${kontenId}`);
+      if (spanJumlah) spanJumlah.textContent = Math.max((parseInt(spanJumlah.textContent, 10) || 0) - 1, 0);
+      await muatKomentar(kontenId);
     }
 
     (async () => {
