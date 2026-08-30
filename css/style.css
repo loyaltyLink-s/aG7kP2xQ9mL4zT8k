@@ -293,6 +293,12 @@ button, input {
   box-shadow: 0 0 8px rgba(176, 107, 255, 0.35);
 }
 
+.level-badge-mini {
+  margin-top: 0;
+  padding: 1px 8px;
+  font-size: 10px;
+}
+
 .profile-field {
   margin-bottom: 18px;
 }
