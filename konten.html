@@ -241,7 +241,7 @@
 
       const { data, error } = await supabaseClient
         .from('komentar')
-        .select('*, profiles(nama, foto_url)')
+        .select('*, profiles(nama, foto_url, is_admin, level)')
         .eq('konten_id', kontenId)
         .order('created_at', { ascending: true });
 
@@ -274,6 +274,8 @@
       function renderSatuKomentar(k, adalahBalasan) {
         const nama = k.profiles?.nama || 'Pengguna';
         const foto = k.profiles?.foto_url || 'assets/default-avatar.png';
+        const isAdmin = !!k.profiles?.is_admin;
+        const labelLevel = isAdmin ? 'Admin' : (k.profiles?.level || 'Member');
         const bolehHapus = session && (session.user.id === k.user_id || profilSaya?.is_admin);
         const nilaiSaya = voteSaya[k.id];
         return `
@@ -281,6 +283,7 @@
             <a href="profil.html?user=${k.user_id}" class="komentar-user">
               <img src="${escapeHTML(foto)}" alt="${escapeHTML(nama)}">
               <span>${escapeHTML(nama)}</span>
+              <span class="level-badge level-badge-mini ${isAdmin ? 'level-badge-admin' : ''}">${labelLevel}</span>
             </a>
             <p class="komentar-isi">${linkifyDanEscape(k.isi)}</p>
             <div class="komentar-aksi">
