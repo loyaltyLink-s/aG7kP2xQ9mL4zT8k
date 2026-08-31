@@ -641,3 +641,51 @@ input[type="file"]::-webkit-file-upload-button:active {
   gap: 10px;
 }
 .komentar-balasan { padding: 0; border-bottom: none; }
+
+/* ==========================================================
+   DEVICE STATUS (kiri bawah)
+   ========================================================== */
+#device-status {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+.ds-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 6px var(--accent-cyan);
+  flex-shrink: 0;
+}
+#device-status.ds-sedang .ds-dot {
+  background: #ffd166;
+  box-shadow: 0 0 6px #ffd166;
+}
+#device-status.ds-buruk .ds-dot {
+  background: var(--accent-pink);
+  box-shadow: 0 0 6px var(--accent-pink);
+}
+
+.ds-ms {
+  color: var(--text);
+  font-weight: 600;
+}
+.ds-sep { color: var(--text-faint); }
+
+@media (max-width: 600px) {
+  .ds-device { display: none; }
+}
