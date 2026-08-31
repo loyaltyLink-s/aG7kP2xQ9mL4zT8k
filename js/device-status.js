@@ -1,76 +1,90 @@
-/* ==========================================================
-   device-status.js — Badge info device & ping ke server
-   Tampil di semua halaman (mirip sidebar), posisi pojok
-   kiri bawah. Panggil renderDeviceStatus() setelah auth.js
-   dimuat (butuh SUPABASE_URL & SUPABASE_ANON_KEY dari sana).
-   Ping diukur ulang tiap 15 detik.
-   ========================================================== */
-
+/**
+ * Mendeteksi informasi browser dan OS secara sederhana
+ */
 function deteksiNamaDevice() {
   const ua = navigator.userAgent;
-
   let os = 'Unknown OS';
-  if (/Windows/i.test(ua)) os = 'Windows';
-  else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
-  else if (/Android/i.test(ua)) os = 'Android';
-  else if (/Mac OS X/i.test(ua)) os = 'macOS';
-  else if (/Linux/i.test(ua)) os = 'Linux';
-
   let browser = 'Browser';
-  if (/Edg\//i.test(ua)) browser = 'Edge';
-  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
-  else if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) browser = 'Chrome';
-  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
-  else if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) browser = 'Safari';
 
-  return `${browser} di ${os}`;
+  if (ua.includes('Win')) os = 'Windows';
+  else if (ua.includes('Mac')) os = 'macOS';
+  else if (ua.includes('Linux')) os = 'Linux';
+  else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+  if (ua.includes('Edg/')) browser = 'Edge';
+  else if (ua.includes('Chrome/')) browser = 'Chrome';
+  else if (ua.includes('Firefox/')) browser = 'Firefox';
+  else if (ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Safari';
+
+  return `${os} • ${browser}`;
 }
 
+/**
+ * Mengukur ping (ms) langsung ke REST endpoint Supabase secara cepat
+ */
 async function ukurPingSupabase() {
-  const mulai = performance.now();
+  const awal = performance.now();
   try {
-    await fetch(`${SUPABASE_URL}/auth/v1/health`, {
-      method: 'GET',
-      headers: { apikey: SUPABASE_ANON_KEY },
-      cache: 'no-store',
+    // Menggunakan fetch HEAD agar super ringan, cepat, dan tidak memberatkan server
+    await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      method: 'HEAD',
+      headers: { 'apikey': SUPABASE_ANON_KEY },
+      cache: 'no-store' // Biar tidak kena cache browser
     });
-  } catch (e) {
-    return null; // gagal konek
+    const akhir = performance.now();
+    return Math.round(akhir - awal);
+  } catch {
+    // Fallback kalau koneksi terputus / fetch gagal
+    return null;
   }
-  return Math.round(performance.now() - mulai);
 }
 
-async function perbaruiPingDeviceStatus() {
-  const el = document.getElementById('device-status');
-  if (!el) return;
-  const msEl = el.querySelector('.ds-ms');
+/**
+ * Membuat dan memperbarui badge status device di pojok kiri bawah
+ */
+async function renderDeviceStatus() {
+  let container = document.getElementById('device-status');
 
-  const ping = await ukurPingSupabase();
-  el.classList.remove('ds-buruk', 'ds-sedang');
-
-  if (ping === null) {
-    msEl.textContent = 'offline';
-    el.classList.add('ds-buruk');
-    return;
+  // Jika belum ada di HTML, buat elemennya otomatis
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'device-status';
+    document.body.appendChild(container);
   }
 
-  msEl.textContent = `${ping} ms`;
-  if (ping > 500) el.classList.add('ds-buruk');
-  else if (ping > 150) el.classList.add('ds-sedang');
+  const infoDevice = deteksiNamaDevice();
+
+  async function perbarui() {
+    const ms = await ukurPingSupabase();
+    let kelasPing = 'ds-ping-bagus';
+    let teksPing = '—';
+
+    if (ms !== null) {
+      teksPing = `${ms} ms`;
+      if (ms > 300) kelasPing = 'ds-ping-buruk';
+      else if (ms > 150) kelasPing = 'ds-ping-sedang';
+    } else {
+      teksPing = 'Offline';
+      kelasPing = 'ds-ping-buruk';
+    }
+
+    container.innerHTML = `
+      <span class="ds-dot ${kelasPing}"></span>
+      <span class="ds-text">${infoDevice}</span>
+      <span class="ds-separator">•</span>
+      <span class="ds-ping ${kelasPing}">${teksPing}</span>
+    `;
+  }
+
+  // Jalankan langsung pertama kali saat dimuat
+  await perbarui();
+
+  // Set interval 2000ms (2 detik) agar tampil secara live & real-time
+  setInterval(perbarui, 2000);
 }
 
-function renderDeviceStatus() {
-  const namaDevice = deteksiNamaDevice();
-  const container = document.createElement('div');
-  container.id = 'device-status';
-  container.innerHTML = `
-    <span class="ds-dot"></span>
-    <span class="ds-device">${namaDevice}</span>
-    <span class="ds-sep">·</span>
-    <span class="ds-ms">mengukur...</span>
-  `;
-  document.body.appendChild(container);
-
-  perbaruiPingDeviceStatus();
-  setInterval(perbaruiPingDeviceStatus, 15000);
-}
+// Otomatis jalankan setelah DOM selesai dimuat
+document.addEventListener('DOMContentLoaded', () => {
+  renderDeviceStatus();
+});
