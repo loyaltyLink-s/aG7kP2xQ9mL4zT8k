@@ -70,9 +70,10 @@
 
   <script src="js/auth.js"></script>
   <script src="js/sidebar.js"></script>
+  <script src="js/device-status.js"></script>
   <script>
     renderSidebar('profil');
-    // Catatan: badge profil TIDAK ditampilkan di halaman ini (sesuai desain)
+    renderDeviceStatus();
 
     let sessionAktif = null;
     let profilAktif = null;
